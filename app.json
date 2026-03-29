@@ -1,0 +1,18 @@
+{
+    "id": "c6d420ff-bd0a-4ec6-b632-b139c469e864",
+    "version": "0.0.1",
+    "requiredApiVersion": "1.41.0",
+    "iconFile": "icon.png",
+    "author": {
+        "name": "Niyati Jain",
+        "homepage": "https://github.com/niy-ati",
+        "support": "https://github.com/niy-ati/anti-spam-prototype"
+    },
+    "name": "anti spam-prototype",
+    "nameSlug": "anti-spam-prototype",
+    "classFile": "AntiSpamPrototypeApp.ts",
+    "description": "anti-spam behavior tracking prototype",
+    "implements": [
+        "IPostMessageSent"
+    ]
+}
