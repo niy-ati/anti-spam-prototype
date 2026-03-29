@@ -34,9 +34,9 @@ This prototype focuses on capturing that **behavioral layer**, which can later b
 
 ### 1. Event Hook
 The app listens to message events using:
-
+```text
 executePostMessageSent()
-
+```
 
 This ensures:
 - zero interference with message flow  
@@ -86,11 +86,6 @@ Result:
 - burst detection is triggered once threshold is crossed  
 
 ---
-
-## Project Structure
-
----
-
 ## Key Design Decisions
 
 ### Lightweight First
@@ -152,15 +147,15 @@ Planned improvements include:
 
 1. Run Rocket.Chat locally (Docker)
 2. Deploy app using Apps CLI:
-   text
-   ```
+  ```text
 rc-apps deploy --url http://localhost:3000
  -u <username> -p <password>
-```
+ ```
 4. Send messages rapidly to trigger detection
 5. Observe logs:
+```text
 docker logs -f rocketchat
-
+```
 
 ---
 
