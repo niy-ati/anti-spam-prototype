@@ -34,7 +34,6 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
         modify: IModify
     ): Promise<void> {
 
-        // 🔥 Debug log to confirm hook execution
         console.log("🔥 Hook triggered for user:", message.sender.id);
 
         const userId = message.sender.id;
@@ -44,34 +43,26 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
             RocketChatAssociationModel.USER,
             userId
         );
-
-        // ✅ Correct way for v1.41 API
         const existing = await read.getPersistenceReader().readByAssociation(association);
 
         let timestamps: number[] = [];
 
-        // ✅ Safe extraction
         if (existing.length > 0) {
             const data = existing[0] as any;
             timestamps = data.timestamps || [];
         }
 
-        // Add current timestamp
         timestamps.push(now);
 
-        // Keep last 10
         if (timestamps.length > 10) {
             timestamps.shift();
         }
-
-        // Save
         await persistence.updateByAssociation(
             association,
             { timestamps },
             true
         );
 
-        // Detect burst (5 messages in 10 sec)
         const recent = timestamps.filter(t => now - t < 10000);
 
         if (recent.length >= 5) {
