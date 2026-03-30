@@ -6,6 +6,19 @@ This project focuses on detecting suspicious activity from new users by tracking
 
 ---
 
+## Demo
+
+This project has been validated with real multi-user scenarios.
+
+Video recordings demonstrating:
+normal vs spam behavior
+burst detection
+link-based moderation
+multi-user isolation
+
+ Demo videos:
+[Drive link to access demo videos](https://drive.google.com/drive/folders/1MoSUZ8LxrwFIq27bEE3Y4wnaDkjZD1Px?usp=sharing)
+
 ## Overview
 
 Instead of relying on isolated rules, this system evaluates user behavior continuously and assigns a risk score based on patterns such as:
