@@ -20,6 +20,14 @@ import {
     RocketChatAssociationRecord,
 } from '@rocket.chat/apps-engine/definition/metadata';
 
+// 🔹 User behavioral state
+type UserState = {
+    timestamps: number[];
+    lastMessages: string[];
+    linkCount: number;
+    score: number;
+};
+
 export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
 
     constructor(info: IAppInfo, logger: ILogger, accessors: IAppAccessors) {
@@ -34,39 +42,207 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
         modify: IModify
     ): Promise<void> {
 
+<<<<<<< HEAD
         console.log("🔥 Hook triggered for user:", message.sender.id);
 
+=======
+>>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
         const userId = message.sender.id;
         const now = Date.now();
+        const text = message.text || "";
+
+        console.log("🔥 Hook triggered for user:", userId);
 
         const association = new RocketChatAssociationRecord(
             RocketChatAssociationModel.USER,
             userId
         );
+<<<<<<< HEAD
+=======
+
+        // 🔹 Load previous state
+>>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
         const existing = await read.getPersistenceReader().readByAssociation(association);
 
-        let timestamps: number[] = [];
+        let state: UserState = {
+            timestamps: [],
+            lastMessages: [],
+            linkCount: 0,
+            score: 0,
+        };
 
         if (existing.length > 0) {
-            const data = existing[0] as any;
-            timestamps = data.timestamps || [];
+    const prev = existing[0] as any;
+
+    state = {
+        timestamps: prev.timestamps || [],
+        lastMessages: prev.lastMessages || [],
+        linkCount: prev.linkCount || 0,
+        score: prev.score || 0,
+    };
+}
+
+        // -------------------------------
+        // 🔹 1. Burst Detection
+        // -------------------------------
+        state.timestamps.push(now);
+
+        if (state.timestamps.length > 10) {
+            state.timestamps.shift();
         }
 
+<<<<<<< HEAD
         timestamps.push(now);
 
         if (timestamps.length > 10) {
             timestamps.shift();
         }
+=======
+        const recent = state.timestamps.filter(t => now - t < 10000);
+        const burstSignal = recent.length >= 5 ? 1 : 0;
+
+        // -------------------------------
+        // 🔹 2. Message Similarity
+        // -------------------------------
+        const similarCount = state.lastMessages.filter(m => m === text).length;
+        const similaritySignal = similarCount >= 2 ? 1 : 0;
+
+        state.lastMessages.push(text);
+
+        if (state.lastMessages.length > 5) {
+            state.lastMessages.shift();
+        }
+
+        // -------------------------------
+        // 🔹 3. Link Extraction
+        // -------------------------------
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const links = text.match(urlRegex) || [];
+
+        if (links.length > 0) {
+            state.linkCount += links.length;
+        }
+
+        // -------------------------------
+        // 🔹 4. Suspicious Link Detection
+        // -------------------------------
+        const suspiciousDomains = ["bit.ly", "tinyurl.com", "spam.com"];
+
+        let suspiciousLinkDetected = false;
+
+        links.forEach(link => {
+            try {
+                let domain = new URL(link).hostname.toLowerCase();
+
+                // 🔥 FIX: normalize domain
+                domain = domain.replace("www.", "");
+
+                if (suspiciousDomains.includes(domain)) {
+                    suspiciousLinkDetected = true;
+                }
+            } catch (e) {}
+        });
+
+        const linkSignal = state.linkCount >= 2 ? 1 : 0;
+
+        // -------------------------------
+        // 🔹 5. Risk Scoring
+        // -------------------------------
+        let score = 0;
+
+        if (burstSignal) score += 0.4;
+        if (similaritySignal) score += 0.2;
+        if (linkSignal) score += 0.2;
+        if (suspiciousLinkDetected) score += 0.3;
+
+        state.score = Math.min(score, 1);
+
+        // -------------------------------
+        // 🔹 6. Explainability
+        // -------------------------------
+        const reasons: string[] = [];
+
+        if (burstSignal) {
+            reasons.push(`burst activity (${recent.length} msgs/10s)`);
+        }
+
+        if (similaritySignal) {
+            reasons.push(`repeated messages (${similarCount})`);
+        }
+
+        if (linkSignal) {
+            reasons.push(`link frequency (${state.linkCount})`);
+        }
+
+        if (suspiciousLinkDetected) {
+            reasons.push("suspicious link detected");
+        }
+
+        // -------------------------------
+        // 🔹 DEBUG LOG (important)
+        // -------------------------------
+        console.log("DEBUG:", {
+            links,
+            suspiciousLinkDetected,
+            score: state.score
+        });
+
+        // -------------------------------
+        // 🔹 7. Save state
+        // -------------------------------
+>>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
         await persistence.updateByAssociation(
             association,
-            { timestamps },
+            state,
             true
         );
 
+<<<<<<< HEAD
         const recent = timestamps.filter(t => now - t < 10000);
+=======
+        // -------------------------------
+// 🔹 8. Moderation Action
+// -------------------------------
+if (suspiciousLinkDetected || state.score >= 0.5) {
+>>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
 
-        if (recent.length >= 5) {
-            console.log(`⚠️ Burst detected for user ${userId}`);
+    console.log("🚨 Moderation Event:", {
+    user: {
+        username: message.sender.username,
+        name: message.sender.name,
+        userId: message.sender.id,
+    },
+    message: message.text,
+    score: state.score,
+});
+
+    if (!message.id) return;
+
+    const updater = modify.getUpdater();
+
+if (!message.id) return;
+
+const builder = await updater.message(message.id, message.sender);
+
+builder.setText("[Message removed: suspected spam]");
+
+await updater.finish(builder);
+    
+}
+
+        // -------------------------------
+        // 🔹 9. Final Logging
+        // -------------------------------
+        if (state.score >= 0.5) {
+            console.log("🚨 Risk Analysis:", {
+                userId,
+                score: state.score,
+                reasons
+            });
         }
+<<<<<<< HEAD
     }
 }
+=======
+    }}
+>>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
