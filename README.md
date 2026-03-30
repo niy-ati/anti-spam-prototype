@@ -1,172 +1,217 @@
-# Rocket.Chat Anti-Spam Prototype (Behavioral Detection)
+# Anti-Spam System for Rocket.Chat
+
+A multi-signal, behavior-based anti-spam system built using Rocket.Chat Apps Engine.
+
+This project focuses on detecting suspicious activity from new users by tracking behavior over time, combining multiple signals, and triggering moderation actions with clear reasoning.
+
+---
 
 ## Overview
 
-This repository contains a small working prototype built on top of the Rocket.Chat Apps Engine to explore how behavioral signals can be used to detect potential spam activity from new users.
+Instead of relying on isolated rules, this system evaluates user behavior continuously and assigns a risk score based on patterns such as:
 
-The goal of this prototype is not to provide a complete anti-spam system, but to validate whether meaningful signals (like message frequency) can be captured, stored, and analyzed in real time within the Rocket.Chat ecosystem.
+- message bursts
+- repeated content
+- link usage
+- suspicious domains
 
----
-
-## What This Prototype Does
-
-- Hooks into message events using `executePostMessageSent`
-- Tracks per-user message timestamps
-- Maintains a small rolling window of recent activity
-- Detects burst messaging behavior (e.g., multiple messages within a short time span)
-- Logs detection signals in real time
+When the system identifies high-risk activity, it automatically moderates the message and provides a structured explanation.
 
 ---
 
-## Why This Matters
+## Key Features
 
-In most communities, early-stage spam is not always obvious from a single message. Instead, it emerges as a pattern:
+- **Per-user behavioral tracking**
+  - Maintains activity history independently for each user
 
-- repeated messages  
-- high-frequency posting  
-- broadcast-like behavior  
+- **Multi-signal detection**
+  - Burst activity (messages in short time window)
+  - Repeated messages
+  - Link frequency
+  - Suspicious domains (e.g. bit.ly, spam.com)
 
-This prototype focuses on capturing that **behavioral layer**, which can later be combined with other signals like similarity, cross-channel activity, or link analysis.
+- **Risk scoring**
+  - Combines signals into a normalized score (0–1)
+
+- **Explainability**
+  - Each decision includes reasons (e.g. burst activity, link spam)
+
+- **Automated moderation**
+  - Replaces suspicious messages in real-time
 
 ---
 
 ## How It Works
 
-### 1. Event Hook
-The app listens to message events using:
+1. Every message triggers a post-message hook  
+2. User behavior is updated and stored  
+3. Signals are computed:
+   - burst
+   - similarity
+   - link usage
+   - suspicious links  
+4. A risk score is calculated  
+5. If threshold is exceeded:
+   - message is replaced  
+   - reasoning is logged  
+
+---
+
+## Example Output
+
+### Moderation Trigger
+# Anti-Spam System for Rocket.Chat
+
+A multi-signal, behavior-based anti-spam system built using Rocket.Chat Apps Engine.
+
+This project focuses on detecting suspicious activity from new users by tracking behavior over time, combining multiple signals, and triggering moderation actions with clear reasoning.
+
+---
+
+## Overview
+
+Instead of relying on isolated rules, this system evaluates user behavior continuously and assigns a risk score based on patterns such as:
+
+- message bursts
+- repeated content
+- link usage
+- suspicious domains
+
+When the system identifies high-risk activity, it automatically moderates the message and provides a structured explanation.
+
+---
+
+## Key Features
+
+- **Per-user behavioral tracking**
+  - Maintains activity history independently for each user
+
+- **Multi-signal detection**
+  - Burst activity (messages in short time window)
+  - Repeated messages
+  - Link frequency
+  - Suspicious domains (e.g. bit.ly, spam.com)
+
+- **Risk scoring**
+  - Combines signals into a normalized score (0–1)
+
+- **Explainability**
+  - Each decision includes reasons (e.g. burst activity, link spam)
+
+- **Automated moderation**
+  - Replaces suspicious messages in real-time
+
+---
+
+## How It Works
+
+1. Every message triggers a post-message hook  
+2. User behavior is updated and stored  
+3. Signals are computed:
+   - burst
+   - similarity
+   - link usage
+   - suspicious links  
+4. A risk score is calculated  
+5. If threshold is exceeded:
+   - message is replaced  
+   - reasoning is logged  
+
+---
+
+## Example Output
 ```text
-executePostMessageSent()
+
+🚫 Moderation triggered: {
+username: "spammer",
+userId: "abc123"
+}
+
+```
+### Risk Analysis
+
+```text
+
+🚨 Risk Analysis: {
+score: 0.8,
+reasons: [
+"burst activity (5 msgs/10s)",
+"suspicious link detected"
+]
+}
 ```
 
-This ensures:
-- zero interference with message flow  
-- compatibility with existing architecture  
-- ability to process signals asynchronously  
+### Moderation Trigger
 
 ---
 
-### 2. State Tracking
+## Demo Scenarios Tested
 
-For each user:
-- timestamps of recent messages are stored using Apps Engine persistence
-- only the last ~10 messages are retained (to keep it lightweight)
+The system was validated using multiple users:
+
+### Normal Behavior
+- regular conversation → no flags
+
+### Burst Activity
+- rapid messages → detected as burst signal
+
+### Link Spam
+- repeated suspicious links → message removed
+
+### Multi-user Isolation
+- normal users unaffected  
+- only malicious user moderated  
+
 
 ---
 
-### 3. Detection Logic
+## Setup
 
-A simple sliding window is applied:
+```text
 
-- count messages sent within the last 10 seconds  
-- if count ≥ 5 → mark as burst behavior  
+### 1. Install dependencies
+npm install
 
----
+### 2. Package the app
 
-### 4. Output
-
-When a burst is detected:
-⚠️ Burst detected for user <userId>
+rc-apps package
 
 
-This is currently logged to the server for validation purposes.
-
----
-
-## Demo (What Was Tested)
-
-The system was tested locally using Docker-based Rocket.Chat setup.
-
-Test scenario:
-1. Send multiple messages rapidly from the same user  
-2. Observe logs in real time  
-
-Result:
-- hook triggers for each message  
-- timestamps accumulate correctly  
-- burst detection is triggered once threshold is crossed  
-
----
-## Key Design Decisions
-
-### Lightweight First
-The prototype intentionally avoids:
-- heavy ML models  
-- expensive synchronous checks  
-
-Instead, it focuses on:
-- minimal overhead  
-- fast execution  
-- incremental signal building  
-
----
-
-### Separation of Concerns
-
-- message capture → synchronous hook  
-- behavior analysis → lightweight computation  
-- future scoring → can be asynchronous  
-
----
-
-### Extensibility
-
-This system is designed to be extended with:
-
-- similarity detection  
-- cross-channel activity tracking  
-- link/domain analysis  
-- risk scoring  
-- moderator-facing summaries  
-
----
-
-## Limitations (Current Scope)
-
-- only considers message frequency  
-- no content-level analysis yet  
-- no automated moderation actions  
-- no UI/dashboard  
-
-This is intentional, as the goal was to validate feasibility before expanding scope.
-
----
-
-## Future Direction
-
-Planned improvements include:
-
-- combining multiple behavioral signals  
-- introducing user-level risk scoring  
-- adding explainable reasoning for flagged users  
-- building moderator-facing summaries  
-- integrating with automated moderation workflows  
-
----
-
-## Setup (Simplified)
-
-1. Run Rocket.Chat locally (Docker)
-2. Deploy app using Apps CLI:
-  ```text
+### 3. Deploy to Rocket.Chat
 rc-apps deploy --url http://localhost:3000
  -u <username> -p <password>
- ```
-4. Send messages rapidly to trigger detection
-5. Observe logs:
-```text
-docker logs -f rocketchat
+
 ```
+---
+
+## Design Decisions
+
+- Detection is lightweight and runs in the post-message hook  
+- State is stored using Rocket.Chat persistence associations  
+- Moderation is applied only after signal aggregation  
+- Logging is structured for debugging and explainability  
 
 ---
 
-## Final Note
+## Future Improvements
 
-This prototype was built to validate a core assumption:
-
-> Behavioral patterns can be captured and processed in real time within Rocket.Chat without impacting message flow.
-
-With this confirmed, the next step is to expand from a single signal (frequency) to a more comprehensive, multi-signal anti-spam system.
+- asynchronous scoring and aggregation  
+- admin dashboard for flagged users  
+- advanced similarity detection  
+- cross-channel behavior tracking  
+- ML-based classification  
 
 ---
 
-The app listens to message events using:
+## Purpose
+
+This project was built to explore how behavioral analysis and explainable moderation can be integrated into Rocket.Chat in a practical and extensible way.
+
+---
+
+## Author
+
+Niyati Jain
+
+---
+
