@@ -20,7 +20,6 @@ import {
     RocketChatAssociationRecord,
 } from '@rocket.chat/apps-engine/definition/metadata';
 
-// 🔹 User behavioral state
 type UserState = {
     timestamps: number[];
     lastMessages: string[];
@@ -42,11 +41,6 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
         modify: IModify
     ): Promise<void> {
 
-<<<<<<< HEAD
-        console.log("🔥 Hook triggered for user:", message.sender.id);
-
-=======
->>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
         const userId = message.sender.id;
         const now = Date.now();
         const text = message.text || "";
@@ -57,11 +51,7 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
             RocketChatAssociationModel.USER,
             userId
         );
-<<<<<<< HEAD
-=======
 
-        // 🔹 Load previous state
->>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
         const existing = await read.getPersistenceReader().readByAssociation(association);
 
         let state: UserState = {
@@ -82,28 +72,15 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
     };
 }
 
-        // -------------------------------
-        // 🔹 1. Burst Detection
-        // -------------------------------
         state.timestamps.push(now);
 
         if (state.timestamps.length > 10) {
             state.timestamps.shift();
         }
 
-<<<<<<< HEAD
-        timestamps.push(now);
-
-        if (timestamps.length > 10) {
-            timestamps.shift();
-        }
-=======
         const recent = state.timestamps.filter(t => now - t < 10000);
         const burstSignal = recent.length >= 5 ? 1 : 0;
 
-        // -------------------------------
-        // 🔹 2. Message Similarity
-        // -------------------------------
         const similarCount = state.lastMessages.filter(m => m === text).length;
         const similaritySignal = similarCount >= 2 ? 1 : 0;
 
@@ -113,9 +90,8 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
             state.lastMessages.shift();
         }
 
-        // -------------------------------
-        // 🔹 3. Link Extraction
-        // -------------------------------
+        //link extraction
+
         const urlRegex = /(https?:\/\/[^\s]+)/g;
         const links = text.match(urlRegex) || [];
 
@@ -123,9 +99,8 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
             state.linkCount += links.length;
         }
 
-        // -------------------------------
-        // 🔹 4. Suspicious Link Detection
-        // -------------------------------
+        //suspicious link detection
+        
         const suspiciousDomains = ["bit.ly", "tinyurl.com", "spam.com"];
 
         let suspiciousLinkDetected = false;
@@ -134,7 +109,6 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
             try {
                 let domain = new URL(link).hostname.toLowerCase();
 
-                // 🔥 FIX: normalize domain
                 domain = domain.replace("www.", "");
 
                 if (suspiciousDomains.includes(domain)) {
@@ -145,9 +119,7 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
 
         const linkSignal = state.linkCount >= 2 ? 1 : 0;
 
-        // -------------------------------
-        // 🔹 5. Risk Scoring
-        // -------------------------------
+
         let score = 0;
 
         if (burstSignal) score += 0.4;
@@ -157,9 +129,6 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
 
         state.score = Math.min(score, 1);
 
-        // -------------------------------
-        // 🔹 6. Explainability
-        // -------------------------------
         const reasons: string[] = [];
 
         if (burstSignal) {
@@ -177,34 +146,18 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
         if (suspiciousLinkDetected) {
             reasons.push("suspicious link detected");
         }
-
-        // -------------------------------
-        // 🔹 DEBUG LOG (important)
-        // -------------------------------
         console.log("DEBUG:", {
             links,
             suspiciousLinkDetected,
             score: state.score
         });
-
-        // -------------------------------
-        // 🔹 7. Save state
-        // -------------------------------
->>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
         await persistence.updateByAssociation(
             association,
             state,
             true
         );
 
-<<<<<<< HEAD
-        const recent = timestamps.filter(t => now - t < 10000);
-=======
-        // -------------------------------
-// 🔹 8. Moderation Action
-// -------------------------------
 if (suspiciousLinkDetected || state.score >= 0.5) {
->>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
 
     console.log("🚨 Moderation Event:", {
     user: {
@@ -230,9 +183,6 @@ await updater.finish(builder);
     
 }
 
-        // -------------------------------
-        // 🔹 9. Final Logging
-        // -------------------------------
         if (state.score >= 0.5) {
             console.log("🚨 Risk Analysis:", {
                 userId,
@@ -240,9 +190,4 @@ await updater.finish(builder);
                 reasons
             });
         }
-<<<<<<< HEAD
-    }
-}
-=======
     }}
->>>>>>> b9eb37d (upgrade: multi-signal spam detection with explainability and moderation)
