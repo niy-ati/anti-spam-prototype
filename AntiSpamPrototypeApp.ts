@@ -1,3 +1,5 @@
+// FULL CLEAN VERSION (FINAL)
+
 import {
     IAppAccessors,
     ILogger,
@@ -25,7 +27,102 @@ type UserState = {
     lastMessages: string[];
     linkCount: number;
     score: number;
+    state: string;
+    roomHistory: { roomId: string; time: number }[];
 };
+
+const CONFIG = {
+    BURST_LIMIT: 5,
+    SIMILAR_LIMIT: 2,
+    LINK_LIMIT: 2,
+
+    SCORE_WEIGHTS: {
+        burst: 10,
+        similarity: 10,
+        link: 10,
+        suspicious: 25,
+        crossRoom: 15,
+    },
+};
+
+const SUSPICIOUS_DOMAINS = ["bit.ly", "tinyurl.com", "spam.com"];
+
+// ---------------- SIGNALS ----------------
+
+function extractSignals(state: UserState, text: string, now: number) {
+    const recent = state.timestamps.filter(t => now - t < 10000);
+    const burst = recent.length >= CONFIG.BURST_LIMIT;
+
+    const similarCount = state.lastMessages.filter(m => m === text).length;
+    const similarity = similarCount >= CONFIG.SIMILAR_LIMIT;
+
+    const links = text.match(/(https?:\/\/[^\s]+)/g) || [];
+
+    if (links.length > 0) {
+        state.linkCount += links.length;
+    }
+
+    let suspicious = false;
+
+    links.forEach(link => {
+        try {
+            const domain = new URL(link).hostname.replace("www.", "");
+            if (SUSPICIOUS_DOMAINS.includes(domain)) {
+                suspicious = true;
+            }
+        } catch {}
+    });
+
+    const link = links.length >= CONFIG.LINK_LIMIT && state.linkCount >= 3;
+
+    const uniqueRooms = new Set(state.roomHistory.map(r => r.roomId));
+    const crossRoom = uniqueRooms.size >= 2;
+
+    return { burst, similarity, link, suspicious, crossRoom };
+}
+
+// ---------------- SCORING ----------------
+
+function computeScore(signals: any) {
+    let score = 0;
+
+    if (signals.burst) score += CONFIG.SCORE_WEIGHTS.burst;
+    if (signals.similarity) score += CONFIG.SCORE_WEIGHTS.similarity;
+    if (signals.suspicious) score += CONFIG.SCORE_WEIGHTS.suspicious;
+    else if (signals.link) score += CONFIG.SCORE_WEIGHTS.link;
+
+    if (signals.crossRoom) score += CONFIG.SCORE_WEIGHTS.crossRoom;
+
+    return score;
+}
+
+function getState(score: number) {
+    if (score >= 80) return "RESTRICTED";
+    if (score >= 60) return "COOLDOWN";
+    if (score >= 40) return "WARNING";
+    return "NORMAL";
+}
+
+// ---------------- HELPERS ----------------
+
+function isClean(signals: any) {
+    return !signals.burst &&
+           !signals.similarity &&
+           !signals.link &&
+           !signals.suspicious &&
+           !signals.crossRoom;
+}
+
+function shouldBlock(signals: any, state: string) {
+    return state === "RESTRICTED" && (
+        signals.burst ||
+        signals.similarity ||
+        signals.suspicious ||
+        signals.link
+    );
+}
+
+// ---------------- MAIN APP ----------------
 
 export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
 
@@ -44,8 +141,7 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
         const userId = message.sender.id;
         const now = Date.now();
         const text = message.text || "";
-
-        console.log("🔥 Hook triggered for user:", userId);
+        const roomId = message.room.id;
 
         const association = new RocketChatAssociationRecord(
             RocketChatAssociationModel.USER,
@@ -59,135 +155,64 @@ export class AntiSpamPrototypeApp extends App implements IPostMessageSent {
             lastMessages: [],
             linkCount: 0,
             score: 0,
+            state: "NORMAL",
+            roomHistory: [],
         };
 
         if (existing.length > 0) {
-    const prev = existing[0] as any;
-
-    state = {
-        timestamps: prev.timestamps || [],
-        lastMessages: prev.lastMessages || [],
-        linkCount: prev.linkCount || 0,
-        score: prev.score || 0,
-    };
-}
-
-        state.timestamps.push(now);
-
-        if (state.timestamps.length > 10) {
-            state.timestamps.shift();
+            state = existing[0] as UserState;
         }
 
-        const recent = state.timestamps.filter(t => now - t < 10000);
-        const burstSignal = recent.length >= 5 ? 1 : 0;
-
-        const similarCount = state.lastMessages.filter(m => m === text).length;
-        const similaritySignal = similarCount >= 2 ? 1 : 0;
+        // ---------- UPDATE STATE ----------
+        state.timestamps.push(now);
+        if (state.timestamps.length > 10) state.timestamps.shift();
 
         state.lastMessages.push(text);
+        if (state.lastMessages.length > 5) state.lastMessages.shift();
 
-        if (state.lastMessages.length > 5) {
-            state.lastMessages.shift();
+        state.roomHistory.push({ roomId, time: now });
+        state.roomHistory = state.roomHistory.filter(r => now - r.time < 120000);
+
+        // ---------- SIGNALS ----------
+        const signals = extractSignals(state, text, now);
+
+        // ---------- SCORE ----------
+        const added = computeScore(signals);
+        state.score = Math.min(state.score + added, 100);
+
+        if (isClean(signals)) {
+            state.score = Math.max(state.score - 15, 0);
         }
 
-        //link extraction
+        state.state = getState(state.score);
 
-        const urlRegex = /(https?:\/\/[^\s]+)/g;
-        const links = text.match(urlRegex) || [];
-
-        if (links.length > 0) {
-            state.linkCount += links.length;
-        }
-
-        //suspicious link detection
-        
-        const suspiciousDomains = ["bit.ly", "tinyurl.com", "spam.com"];
-
-        let suspiciousLinkDetected = false;
-
-        links.forEach(link => {
-            try {
-                let domain = new URL(link).hostname.toLowerCase();
-
-                domain = domain.replace("www.", "");
-
-                if (suspiciousDomains.includes(domain)) {
-                    suspiciousLinkDetected = true;
-                }
-            } catch (e) {}
+        console.log("📊 Risk:", {
+            userId,
+            score: state.score,
+            state: state.state,
+            signals
         });
 
-        const linkSignal = state.linkCount >= 2 ? 1 : 0;
+        await persistence.updateByAssociation(association, state, true);
 
-
-        let score = 0;
-
-        if (burstSignal) score += 0.4;
-        if (similaritySignal) score += 0.2;
-        if (linkSignal) score += 0.2;
-        if (suspiciousLinkDetected) score += 0.3;
-
-        state.score = Math.min(score, 1);
-
-        const reasons: string[] = [];
-
-        if (burstSignal) {
-            reasons.push(`burst activity (${recent.length} msgs/10s)`);
-        }
-
-        if (similaritySignal) {
-            reasons.push(`repeated messages (${similarCount})`);
-        }
-
-        if (linkSignal) {
-            reasons.push(`link frequency (${state.linkCount})`);
-        }
-
-        if (suspiciousLinkDetected) {
-            reasons.push("suspicious link detected");
-        }
-        console.log("DEBUG:", {
-            links,
-            suspiciousLinkDetected,
-            score: state.score
-        });
-        await persistence.updateByAssociation(
-            association,
-            state,
-            true
-        );
-
-if (suspiciousLinkDetected || state.score >= 0.5) {
-
-    console.log("🚨 Moderation Event:", {
-    user: {
-        username: message.sender.username,
-        name: message.sender.name,
-        userId: message.sender.id,
-    },
-    message: message.text,
-    score: state.score,
-});
-
-    if (!message.id) return;
-
-    const updater = modify.getUpdater();
-
-if (!message.id) return;
-
-const builder = await updater.message(message.id, message.sender);
-
-builder.setText("[Message removed: suspected spam]");
-
-await updater.finish(builder);
-    
-}
-
-        if (state.score >= 0.5) {
-            console.log("🚨 Risk Analysis:", {
-                userId,
-                score: state.score,
-                reasons
+        // ---------- MODERATION ----------
+        if (state.state === "WARNING") {
+            await modify.getNotifier().notifyUser(message.sender, {
+                room: message.room,
+                sender: message.sender,
+                text: "⚠️ Please avoid spam-like behavior."
             });
         }
-    }}
+
+        if (shouldBlock(signals, state.state)) {
+            if (!message.id) return;
+
+            const updater = modify.getUpdater();
+            const builder = await updater.message(message.id, message.sender);
+
+            builder.setText("[Message blocked: repeated spam behavior]");
+
+            await updater.finish(builder);
+        }
+    }
+}
