@@ -10,221 +10,227 @@ This project focuses on detecting suspicious activity from new users by tracking
 
 This project has been validated with real multi-user scenarios.
 
-Video recordings demonstrating:
-normal vs spam behavior
-burst detection
-link-based moderation
-multi-user isolation
+Video recordings demonstrating:  
+normal vs spam behavior  
+burst detection  
+link-based moderation  
+multi-user isolation  
+recovery behavior (restricted → normal)  
+AI-assisted explainability  
 
- Demo videos:
+**Demo videos:**  
 [Drive link to access demo videos](https://drive.google.com/drive/folders/1MoSUZ8LxrwFIq27bEE3Y4wnaDkjZD1Px?usp=sharing)
 
+---
+
 ## Overview
 
-Instead of relying on isolated rules, this system evaluates user behavior continuously and assigns a risk score based on patterns such as:
+Instead of relying on isolated rules, this system evaluates **user behavior continuously** and assigns a dynamic risk score based on patterns such as:
 
-- message bursts
-- repeated content
-- link usage
-- suspicious domains
+- message bursts  
+- repeated content  
+- link usage  
+- suspicious domains  
+- cross-room activity  
+- mention abuse  
+- repeated link propagation  
 
-When the system identifies high-risk activity, it automatically moderates the message and provides a structured explanation.
+The system applies **progressive moderation with recovery**, ensuring fairness while maintaining strong protection against spam.
+
+When high-risk activity is detected, the system:
+- moderates the message  
+- logs structured reasoning  
+- optionally triggers AI-based analysis  
 
 ---
 
 ## Key Features
 
-- **Per-user behavioral tracking**
-  - Maintains activity history independently for each user
+### **Per-user behavioral tracking**
+- Maintains independent state for each user  
+- Tracks message history, timestamps, and room activity  
 
-- **Multi-signal detection**
-  - Burst activity (messages in short time window)
-  - Repeated messages
-  - Link frequency
-  - Suspicious domains (e.g. bit.ly, spam.com)
+### **Multi-signal detection**
+- Burst activity (rapid messages)  
+- Repeated messages (similarity detection)  
+- Link frequency and density  
+- Suspicious domains (e.g. bit.ly, spam.com)  
+- Cross-room spam behavior  
+- Join velocity (rapid room activity)  
+- Low content diversity (link-heavy behavior)  
+- Mention ratio detection (targeted spam)  
+- Repeated domain propagation (polymorphic spam)  
 
-- **Risk scoring**
-  - Combines signals into a normalized score (0–1)
+### **Behavioral risk scoring**
+- Weighted scoring system (0–100)  
+- Tracks risk trends over time (`riskHistory`)  
+- Designed for consistency, not spikes  
 
-- **Explainability**
-  - Each decision includes reasons (e.g. burst activity, link spam)
+### **Progressive moderation system**
+- NORMAL → no action  
+- WARNING → user notified  
+- COOLDOWN → monitored behavior  
+- RESTRICTED → conditional blocking  
 
-- **Automated moderation**
-  - Replaces suspicious messages in real-time
+### **Recovery & trust system (key innovation)**
+- Clean behavior reduces score  
+- Trust-based recovery (clean streak)  
+- Users can exit restriction dynamically  
+- Prevents long-term penalization  
+
+### **Explainability layer**
+- Structured reasons for every decision  
+- Signal-based reasoning (e.g. burst, similarity, domain)  
+- Logs for debugging and transparency  
+
+### **AI-assisted moderation (async, non-blocking)**
+- Triggered only for high-risk users  
+- Generates summary + confidence  
+- Stored in user state (`aiSummary`, `aiConfidence`)  
+- Uses safe placeholder endpoint for demo  
+
+### **Reporting layer**
+- Daily flagged user tracking  
+- Rolling risk statistics  
+- Supports future dashboard integration  
+
+### **Multi-user safe architecture**
+- Fully isolated per-user state  
+- Persistence-based (Apps Engine compliant)  
+- Safe for distributed environments  
 
 ---
 
 ## How It Works
 
 1. Every message triggers a post-message hook  
-2. User behavior is updated and stored  
+2. User state is updated and persisted  
 3. Signals are computed:
-   - burst
-   - similarity
-   - link usage
-   - suspicious links  
-4. A risk score is calculated  
-5. If threshold is exceeded:
-   - message is replaced  
+   - burst  
+   - similarity  
+   - link usage  
+   - suspicious domains  
+   - cross-room activity  
+   - mention ratio  
+   - repeated domain patterns  
+
+4. A behavioral risk score is calculated  
+5. State transitions dynamically:
+   - NORMAL → WARNING → COOLDOWN → RESTRICTED  
+
+6. Recovery logic applies:
+   - clean messages reduce score  
+   - restriction is lifted if behavior improves  
+
+7. If high-risk:
+   - message is conditionally blocked  
    - reasoning is logged  
+   - AI analysis is triggered (async)  
 
 ---
 
 ## Example Output
 
 ### Moderation Trigger
-# Anti-Spam System for Rocket.Chat
 
-A multi-signal, behavior-based anti-spam system built using Rocket.Chat Apps Engine.
-
-This project focuses on detecting suspicious activity from new users by tracking behavior over time, combining multiple signals, and triggering moderation actions with clear reasoning.
-
----
-
-## Overview
-
-Instead of relying on isolated rules, this system evaluates user behavior continuously and assigns a risk score based on patterns such as:
-
-- message bursts
-- repeated content
-- link usage
-- suspicious domains
-
-When the system identifies high-risk activity, it automatically moderates the message and provides a structured explanation.
-
----
-
-## Key Features
-
-- **Per-user behavioral tracking**
-  - Maintains activity history independently for each user
-
-- **Multi-signal detection**
-  - Burst activity (messages in short time window)
-  - Repeated messages
-  - Link frequency
-  - Suspicious domains (e.g. bit.ly, spam.com)
-
-- **Risk scoring**
-  - Combines signals into a normalized score (0–1)
-
-- **Explainability**
-  - Each decision includes reasons (e.g. burst activity, link spam)
-
-- **Automated moderation**
-  - Replaces suspicious messages in real-time
-
----
-
-## How It Works
-
-1. Every message triggers a post-message hook  
-2. User behavior is updated and stored  
-3. Signals are computed:
-   - burst
-   - similarity
-   - link usage
-   - suspicious links  
-4. A risk score is calculated  
-5. If threshold is exceeded:
-   - message is replaced  
-   - reasoning is logged  
-
----
-
-## Example Output
 ```text
-
 🚫 Moderation triggered: {
-username: "spammer",
-userId: "abc123"
+  username: "spammer",
+  userId: "abc123"
 }
-
 ```
+
 ### Risk Analysis
-
 ```text
-
 🚨 Risk Analysis: {
-score: 0.8,
-reasons: [
-"burst activity (5 msgs/10s)",
-"suspicious link detected"
-]
+  score: 82,
+  state: "RESTRICTED",
+  reasons: [
+    "High activity (6/10s)",
+    "Repeated messages (3)",
+    "Suspicious domain",
+    "Repeated link domain pattern"
+  ],
+  aiConfidence: "high"
 }
+
 ```
-
-### Moderation Trigger
-
----
-
 ## Demo Scenarios Tested
 
-The system was validated using multiple users:
-
 ### Normal Behavior
-- regular conversation → no flags
+- regular conversation → no flags  
 
 ### Burst Activity
-- rapid messages → detected as burst signal
+- rapid messages → detected and escalated  
 
 ### Link Spam
-- repeated suspicious links → message removed
+- repeated suspicious links → blocked  
+
+### Recovery Behavior
+- user sends clean messages → restriction lifted  
 
 ### Multi-user Isolation
-- normal users unaffected  
-- only malicious user moderated  
-
+- only malicious users are affected  
+- normal users remain unaffected  
 
 ---
 
 ## Setup
 
-```text
-
-### 1. Install dependencies
+```bash
+# 1. Install dependencies
 npm install
 
-### 2. Package the app
-
+# 2. Package the app
 rc-apps package
 
-
-### 3. Deploy to Rocket.Chat
-rc-apps deploy --url http://localhost:3000
- -u <username> -p <password>
-
+# 3. Deploy to Rocket.Chat
+rc-apps deploy --url http://localhost:3000 \
+-u <username> -p <password>
 ```
 ---
 
 ## Design Decisions
+- Detection is lightweight and runs in post-message hook
+- State is stored using Rocket.Chat persistence associations
+- Moderation decisions are behavior-driven, not message-based
+- Recovery is integrated to reduce false positives
+- AI layer is async and non-blocking
+- System is designed to degrade gracefully
 
-- Detection is lightweight and runs in the post-message hook  
-- State is stored using Rocket.Chat persistence associations  
-- Moderation is applied only after signal aggregation  
-- Logging is structured for debugging and explainability  
+---
+
+## Architecture Highlights
+- Behavioral state model per user
+- Multi-signal aggregation
+- Deterministic scoring engine
+- Progressive enforcement with recovery
+- Explainability-first design
+- AI-assisted reasoning layer
+- Reporting and analytics readiness
 
 ---
 
 ## Future Improvements
-
-- asynchronous scoring and aggregation  
-- admin dashboard for flagged users  
-- advanced similarity detection  
-- cross-channel behavior tracking  
-- ML-based classification  
+- Admin dashboard for real-time monitoring
+/antispam admin commands (status, analyze, reset)
+- RAG-based AI explanations
+- advanced similarity (MinHash / embeddings)
+- mention targeting analysis
+- anomaly detection layer
+- cross-instance aggregation
 
 ---
 
 ## Purpose
 
-This project was built to explore how behavioral analysis and explainable moderation can be integrated into Rocket.Chat in a practical and extensible way.
+This project explores how behavioral intelligence, recovery-aware moderation, and explainability can be combined to build scalable trust & safety systems within Rocket.Chat.
 
----
-
-## Author
+Author
 
 Niyati Jain
 
+
 ---
+
 
