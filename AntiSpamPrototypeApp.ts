@@ -38,6 +38,10 @@ type UserState = {
     riskHistory: number[];
     lastActive: number;
     aiConfidence?: string;
+    dailyStats?: {
+    flaggedCount: number;
+    lastReset: number;
+};
 };
 
 const CONFIG = {
@@ -106,6 +110,20 @@ function extractSignals(state: UserState, text: string, now: number) {
     const lowDiversity =
     state.lastMessages.length >= 3 &&
     state.lastMessages.every(m => m.includes("http"));
+    const mentionCount = (text.match(/@\w+/g) || []).length;
+    const totalWords = text.split(" ").length || 1;
+    const mentionRatio = mentionCount / totalWords;
+    const linkDomains = links.map(link => {
+    try {
+        return new URL(link).hostname.replace("www.", "");
+    } catch {
+        return "";
+    }
+});
+
+const repeatedDomain =
+    linkDomains.length > 0 &&
+    linkDomains.every(d => d === linkDomains[0]);
     return {
         burst,
         similarity,
@@ -117,6 +135,8 @@ function extractSignals(state: UserState, text: string, now: number) {
         similarCount,
         lowDiversity,
         roomSpread: uniqueRooms.size,
+        mentionRatio,
+        repeatedDomain,
     };
 }
 
@@ -128,10 +148,12 @@ function computeScore(signals: any) {
     if (signals.burst) score += CONFIG.SCORE_WEIGHTS.burst;
     if (signals.similarity) score += CONFIG.SCORE_WEIGHTS.similarity;
     if (signals.suspicious) score += CONFIG.SCORE_WEIGHTS.suspicious;
-if (signals.link) score += CONFIG.SCORE_WEIGHTS.link;
-if (signals.joinVelocity) score += 10;
+    if (signals.link) score += CONFIG.SCORE_WEIGHTS.link;
+    if (signals.joinVelocity) score += 10;
     if (signals.crossRoom) score += CONFIG.SCORE_WEIGHTS.crossRoom;
     if (signals.lowDiversity) score += 8;
+    if (signals.mentionRatio > 0.3) score += 5;
+    if (signals.repeatedDomain) score += 8;
 
     return score;
 }
@@ -168,7 +190,11 @@ function generateReasons(signals: any): string[] {
 
 if (signals.lowDiversity)
     reasons.push(`Low content diversity (link-heavy behavior)`);
+if (signals.mentionRatio > 0.3)
+    reasons.push(`High mention ratio`);
 
+if (signals.repeatedDomain)
+    reasons.push(`Repeated link domain pattern`);
     return reasons;
 }
 
@@ -301,15 +327,25 @@ if (now - state.lastActive > 1000 * 60 * 60 * 24 * 7) {
       //scoring
         const addedScore = computeScore(signals);
         state.score = Math.min(state.score + addedScore, 100);
+        // daily report tracking 
+        if (!state.dailyStats) {
+            state.dailyStats = { flaggedCount: 0, lastReset: now };
+        }
+        if (now - state.dailyStats.lastReset > 1000 * 60 * 60 * 24) {
+            state.dailyStats.flaggedCount = 0;
+            state.dailyStats.lastReset = now;
+        }
+
+        if (state.score >= 60) {
+            state.dailyStats.flaggedCount += 1;
+}
         state.riskHistory.push(state.score);
 if (state.riskHistory.length > 10) state.riskHistory.shift();
         // Admin flagging
 state.flagged = state.score >= 60;
-
         const spamMessage = isSpamLikeMessage(text, signals);
 
         // recovery engine
-
         if (!spamMessage) {
     state.cleanStreak += 1;
 
