@@ -474,3 +474,5 @@ if (state.state === "RESTRICTED") {
 // FINAL STATE SAVE (VERY IMPORTANT)
 // -------------------------------
 await persistence.updateByAssociation(association, state, true);
+    }
+}
